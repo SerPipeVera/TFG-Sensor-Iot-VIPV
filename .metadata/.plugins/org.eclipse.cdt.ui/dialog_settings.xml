@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="completion_proposal_size">
+		<item key="size.x" value="1167"/>
+		<item key="size.y" value="456"/>
+	</section>
+	<section name="org.eclipse.cdt.ui.text.hover.CMacroExpansionExploration">
+	</section>
+	<section name="PDOMSearchPage">
+		<item key="caseSensitive" value="false"/>
+		<item key="searchFlags" value="227191"/>
+		<list key="previousPatterns">
+			<item value="vl530"/>
+			<item value="DMA_TypeDef"/>
+			<item value="DMA2_Channel"/>
+			<item value="DMA"/>
+			<item value="CHANNEL_OFFSET_TAB"/>
+			<item value="LL_DMA_GetDataLength"/>
+			<item value="DMA_CHANNEL"/>
+			<item value="dma2"/>
+			<item value="idle"/>
+		</list>
+	</section>
+	<section name="org.eclipse.cdt.ui.text.hover.CMacroExpansionExploration.internal">
+		<item key="size.width" value="640"/>
+		<item key="size.height" value="180"/>
+	</section>
+	<section name="OptionalMessageDialog.hide.">
+		<item key="askReindex.detail" value="0"/>
+	</section>
+	<section name="org.eclipse.cdt.internal.ui.includebrowser.IBViewPart">
+		<item key="inactiveFilter" value="false"/>
+		<item key="systemFilter" value="false"/>
+		<item key="includedBy" value="true"/>
+		<item key="showFolders" value="false"/>
+	</section>
+	<section name="CResourceRenameRefactoringInputPage">
+	</section>
+</section>

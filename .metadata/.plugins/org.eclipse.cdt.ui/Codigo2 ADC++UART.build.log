@@ -1,0 +1,19 @@
+15:20:34 **** Build of configuration Debug for project Codigo2 ADC++UART ****
+make -j8 all 
+arm-none-eabi-gcc -o "Codigo2 ADC++UART.elf" @"objects.list"   -mcpu=cortex-m4 -T"D:\UPM\4.2 - TFG\Codigo BLIOTA\Codigo ADC +UART\Codigo2 ADC +UART integracion\STM32L475VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Codigo2 ADC++UART.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -u _scanf_float -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Codigo2 ADC++UART.elf
+ 
+arm-none-eabi-objdump -h -S  Codigo2\ ADC++UART.elf  > "Codigo2 ADC++UART.list"
+arm-none-eabi-objcopy  -O binary  Codigo2\ ADC++UART.elf  "Codigo2 ADC++UART.bin"
+arm-none-eabi-size   Codigo2\ ADC++UART.elf 
+   text	   data	    bss	    dec	    hex	filename
+  54084	    484	   3572	  58140	   e31c	Codigo2 ADC++UART.elf
+Finished building: default.size.stdout
+ 
+Finished building: Codigo2 ADC++UART.bin
+ 
+Finished building: Codigo2 ADC++UART.list
+ 
+
+15:20:38 Build Finished. 0 errors, 0 warnings. (took 3s.847ms)
+
