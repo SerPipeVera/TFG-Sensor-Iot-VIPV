@@ -35,8 +35,11 @@ static bool flag_lectura_datos=false, flag_publi_datos = false, flag_recupera_da
 
 RTC_TimeTypeDef sTiempo_actual;		//Variables para el RTC
 RTC_DateTypeDef sDia_actual;
+
+#ifdef ENABLE_SLEEP
 float Hora_Amanecer_Oficial = 0.0f;  //por defecto, que no duerma nada
 float Hora_Atardecer_Oficial = 24.0f;	//esto en relacion al GMT, la franja que usa el RTC
+#endif
 
 fifo miFIFO;	//Estructura FIFO para la recuperación de datos
 megaDato mimegaDato = {0.0f};	//Estrucutra de dato con todas las magnitudes a medir
@@ -65,8 +68,6 @@ void aplicacion_ClienteMQTT_XCLD_IoT(void)
   if ( inicializa_ConexionIoT() == true)  {	//si es correcto
 
     iniciado_Programa = true;
-    get_AmanecerAtardecer(&Hora_Amanecer_Oficial, &Hora_Atardecer_Oficial, LATITUD_STD, LONGITUD_STD) ;
-    	/* De partida, sin estar listo el modulo de GPS, calculamos a priori si es de noche o de dia en el IES */
 
     do { 	/*++++++++++++++++++++++ B U C L E    P R I N C I P A L    D E L	  P R O G R A M A ++++++++++++++++++++++++++++++++*/
 
@@ -74,6 +75,18 @@ void aplicacion_ClienteMQTT_XCLD_IoT(void)
        ret = check_protocoloConexion();
 
        conex_correcta = inicia_ClienteMQTT(ret);
+
+#ifdef ENABLE_SLEEP
+    get_AmanecerAtardecer(&Hora_Amanecer_Oficial, &Hora_Atardecer_Oficial, LATITUD_STD, LONGITUD_STD) ;
+    	/* De partida, sin estar listo el modulo de GPS, calculamos a priori si es de noche o de dia en el IES */
+      /*Antes de continuar, compurba si ya es de noche para seguir captando y enviando datos */
+      if( SUENYO == get_PeriodoDia(&Hora_Amanecer_Oficial, &Hora_Atardecer_Oficial) && estaFIFOvacia(&miFIFO)==0 )
+    	{
+      	printf("\n La hora actual indica que es de Noche, el dispositivo entrara en Sleep Mode...\n");
+      	entraSleepMode(Hora_Amanecer_Oficial);
+      	//una vez despierta, resetea el programa para reiniciar todo de nuevo
+         }
+#endif
 
       if (conex_correcta)  {
 
@@ -504,7 +517,6 @@ void recabar_Datos(megaDato* miLectura){
 
 	float latit_raw=NAN, longit_raw=NAN, altit_raw=NAN,speed_raw=NAN, temp_raw=NAN, hum_raw=NAN, pres_raw=NAN;
 
-
 	 if (HAL_RTC_GetTime(&hrtc, &sTiempo_actual, RTC_FORMAT_BIN) != HAL_OK ) {	//prioritario, tomar hora actual
 	    	printf("Error al dar las obterner hora-fecha actual del RTC.\n");
 	 }
@@ -521,7 +533,6 @@ void recabar_Datos(megaDato* miLectura){
 	 }
 
 	HAL_ResumeTick();
-	//HAL_GPIO_WritePin(GPIOC, ARD_A2_LEDON_Pin, GPIO_PIN_SET); //indicador visual
 
 	hum_raw = BSP_HSENSOR_ReadHumidity();
 	pres_raw = BSP_PSENSOR_ReadPressure();
@@ -572,9 +583,6 @@ void recabar_Datos(megaDato* miLectura){
 	    		);
 #endif
 
-		//HAL_SuspendTick();
-		//HAL_GPIO_WritePin(GPIOC, ARD_A2_LEDON_Pin, GPIO_PIN_RESET); //indicador visual
-
 }
 
 
@@ -589,7 +597,7 @@ void mideRadiacion(float vectIrradiancia[])
 {
 	float nivelmedioADC = 0,  offset_ADC = 0; //nivel de Offset medido en el ADC
 
-	/*Estado de partida*/
+	//Estado de partida
 	  HAL_GPIO_WritePin(ARD_D10_MFT_GPIO_Port, ARD_D10_MFT_Pin, GPIO_PIN_SET);
 
 	  HAL_GPIO_WritePin(GPIOA, ARD_D4_Pin|ARD_D7_Pin, GPIO_PIN_RESET);
@@ -666,7 +674,7 @@ void mideRadiacion(float vectIrradiancia[])
 		}
 		else{
 
-		tensionADC = ( (float)(nivelmedioADC - offset_ADC)/NIVELES_ADC ) * VREF_ADC;  //en miliVoltios
+		tensionADC = ( (float) abs(nivelmedioADC - offset_ADC)/NIVELES_ADC ) * VREF_ADC;  //en miliVoltios
 
 		corrienteFV =  tensionADC /  (SENS_HALL * FACTOR_OPAMP);	//en mA
 
@@ -729,6 +737,37 @@ float orienta_Magneto(void) {
 	float vector_Heading[NLECTURAS_MAGNETO] = {0.0f};
 	uint8_t rechazados = 0;
 
+	int16_t rawAccelero[3]= {0};	//quitar
+	float rawGyro[3] = { 0.0f };
+	int16_t rawAccelero_v[3] = {0};	//quitar
+	float rawGyro_v[3] = { 0.0f };
+
+	float anglX = 0, anglY = 0, anglZ = 0;
+
+	for(uint8_t i =0; i<100; i++) {
+		BSP_ACCELERO_AccGetXYZ(&rawAccelero_v[0]);
+		BSP_GYRO_GetXYZ(&rawGyro_v[0]);
+		for(uint8_t j =0; j<3; j++) {
+			 rawAccelero[j] += rawAccelero_v[j];	//quitar
+			 rawGyro[j] += rawGyro_v[j];
+		}
+	HAL_Delay(1);
+	}
+
+	for(uint8_t j =0; j<3; j++) {
+		 rawAccelero[j] = rawAccelero[j] / 100;	//quitar
+		 rawGyro[j] = rawGyro[j]/100;
+	}
+	printf("\nComponentes medio de ACCELEROMETRO X=%d Y=%d Z=%d \n ",rawAccelero[0], rawAccelero[1], rawAccelero[2] );
+	printf("Componentes medio de GYROSCOPIO X=%f Y=%f Z=%f \n ",rawGyro[0], rawGyro[1], rawGyro[2] );
+
+	anglX = rad2deg( atan2f( (float)rawAccelero[0] , sqrtf(rawAccelero[1]*rawAccelero[1] + rawAccelero[2]*rawAccelero[2]) ));
+	anglY = rad2deg( atan2f( (float)rawAccelero[1] , sqrtf(rawAccelero[0]*rawAccelero[0] + rawAccelero[2]*rawAccelero[2]) ));
+	anglZ = rad2deg( atan2f( sqrtf(rawAccelero[0]*rawAccelero[0] + rawAccelero[1]*rawAccelero[1]) , (float)rawAccelero[2] ));
+
+	printf("\nComponentes  INCLINACION X=%f Y=%f Z=%f \n\n ",anglX, anglY, anglZ );
+
+
 	for (uint8_t i =0; i<NLECTURAS_MAGNETO; i++)
 	{
 		BSP_MAGNETO_GetXYZ( &magnetoGauss[0]);
@@ -736,8 +775,7 @@ float orienta_Magneto(void) {
 		magnetoHeading = atan2f((float)magnetoGauss[1], (float)magnetoGauss[0]); //arcotangente de Y/X
 		magnetoHeading= rad2deg(magnetoHeading);
 
-		if(magnetoHeading<0)
-			{ magnetoHeading += 360.0f;  }
+		if(magnetoHeading<0)  { magnetoHeading += 360.0f;  }
 
 		if(magnetoHeading<67.5964f )		//Se calibra el magetómetro por funciones a intervalos
 		{
@@ -752,8 +790,7 @@ float orienta_Magneto(void) {
 			magnetoHeading = (-2.2181f)*magnetoHeading + 512.35f;
 		}
 
-		if(magnetoHeading>=360.0f)
-			{ magnetoHeading -= 360.0f;  }
+		if(magnetoHeading>=360.0f)	{ magnetoHeading -= 360.0f;  }
 
 		suma_Heading += magnetoHeading;
 		vector_Heading[i] = magnetoHeading;
@@ -775,7 +812,7 @@ float orienta_Magneto(void) {
 		}
 	}
 
-if( rechazados <(float)NLECTURAS_MAGNETO/2.0f )	//SI HAY MAS DE 1/2 DE RECHAZADOS
+if( rechazados < (float)NLECTURAS_MAGNETO/2.0f )	//SI HAY MAS DE 1/2 DE RECHAZADOS
 {
 	return  ( suma_Heading/(float)(NLECTURAS_MAGNETO-rechazados) );
 }
@@ -825,13 +862,13 @@ void imprimir_Dato(megaDato Dato)  {
 
     printf("\n************************ DATOS PUBLICADOS EN LA NUBE DE THINGSPEAK ************************\n"
     		"-------------------------------- CANAL 1 ---------------------------------\n"
-   	    		"Campo 1: Irradiancia modulo FV 1:          %f W\n"
-   	    		"Campo 2: Irradiancia modulo FV 2:          %f W\n"
-   	    		"Campo 3: Irradiancia modulo FV 3:          %f W\n"
-   	    		"Campo 4: Irradiancia modulo FV 4:          %f W\n"
-   	    		"Campo 5: Irradiancia modulo FV 5:          %f W\n"
+   	    		"Campo 1: Irradiancia modulo FV 1:          %f W/m^2\n"
+   	    		"Campo 2: Irradiancia modulo FV 2:          %f W/m^2\n"
+   	    		"Campo 3: Irradiancia modulo FV 3:          %f W/m^2\n"
+   	    		"Campo 4: Irradiancia modulo FV 4:          %f W/m^2\n"
+   	    		"Campo 5: Irradiancia modulo FV 5:          %f W/m^2\n"
 	    		"Campo 6: Temperatura interior del sensor:  %f %cC\n"
-	    		"Campo 7: Presion interior del sensor:      %f mbar\n"
+	    		"Campo 7: Presion interior del sensor:      %f hPa\n"
 	    		"Campo 8: Humedad interior del sensor:      %f %%\n"
 
     		"-------------------------------- CANAL 2 ---------------------------------\n"
@@ -1078,7 +1115,7 @@ void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim)
 			 contador_publi = 0;
 		}
 
-		if ( estado == DESCONECTADO) {	//si se encuentra desconectado
+		if ( estado == DESCONECTADO || estaFIFOvacia(&miFIFO)) {	//si se encuentra desconectado
 
 			contador_reconex++;
 

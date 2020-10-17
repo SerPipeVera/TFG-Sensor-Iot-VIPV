@@ -125,6 +125,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  HAL_Delay(1500); //para evitar reinicios en la subida de codigo
   BSP_LED_Init(LED_GREEN);	//Led de usuario en la placa
   BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);	//PushButton de la placa
   /* USER CODE END SysInit */
@@ -144,6 +145,7 @@ int main(void)
   MX_LPTIM1_Init();
   MX_LPTIM2_Init();
   /* USER CODE BEGIN 2 */
+
   /* Estado inicial de algunos puertos de salida*/
   HAL_GPIO_WritePin(ARD_A0_3_3CTRL_GPIO_Port, ARD_A0_3_3CTRL_Pin, GPIO_PIN_SET);
   	  	  	  	  	  	  	  /*encender alimentacion sensores a 3.3V del BMS */
@@ -590,7 +592,7 @@ static void MX_RTC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
-  HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
+  HAL_NVIC_DisableIRQ(RTC_WKUP_IRQn);
   /* USER CODE END RTC_Init 2 */
 
 }
@@ -764,10 +766,10 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
   /* DMA2_Channel5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Channel5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA2_Channel5_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(DMA2_Channel5_IRQn);
 
 }
@@ -952,10 +954,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(ISM43362_DRDY_EXTI1_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }

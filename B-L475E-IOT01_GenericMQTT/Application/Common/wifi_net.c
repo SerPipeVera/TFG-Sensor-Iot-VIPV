@@ -49,6 +49,7 @@
 #include "wifi.h"
 #include "iot_flash_config.h"
 
+
 /* Private defines -----------------------------------------------------------*/
 
 #ifdef ES_WIFI_PRODUCT_NAME_SIZE
@@ -62,6 +63,7 @@
 int net_if_init(void * if_ctxt);
 int net_if_deinit(void * if_ctxt);
 int net_if_reinit(void * if_ctxt);
+extern void desinicializarPerifericos(void);
 
 /* Functions Definition ------------------------------------------------------*/
 int net_if_init(void * if_ctxt)
@@ -129,7 +131,7 @@ int net_if_init(void * if_ctxt)
     printf("\n Conectando al hotspot: %s    Intento %d...",ssid, ++wifiConnectCounter);
     wifiRes = WIFI_Connect(ssid, psk, security_mode);
     if (wifiRes == WIFI_STATUS_OK) break;
-  }  while (wifiConnectCounter <= 17);	//REALIZA 17 INTENTOS COMO MAXIMO
+  }  while (wifiConnectCounter <= NMAX_INTENTOS_CONEX);	//REALIZA n INTENTOS COMO MAXIMO
   
   if (wifiRes == WIFI_STATUS_OK)
   {
@@ -138,6 +140,10 @@ int net_if_init(void * if_ctxt)
   else
   {
     printf("\nFallo al conectar al AP %s\n",ssid);
+
+    desinicializarPerifericos();
+    printf("\n\t El dispositivo se mantendra en modo inactivo hasta su reinicio... \n");
+    HAL_PWREx_EnterSHUTDOWNMode();
   }
   
   return (wifiRes == WIFI_STATUS_OK)?0:-1;

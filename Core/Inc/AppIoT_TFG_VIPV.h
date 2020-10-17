@@ -28,7 +28,7 @@
 				/*Compila el código habilitando la funcionalidad de entrar en modo Sleep. Comentar para deshabilitar */
 #define ENABLE_IMPRIMIR_MUESTRAS
 				/*Compila el código habilitando la funcionalidad de Imprimir los datos muestreados. Comentar para deshabilitar */
-#define ENABLE_LOWPWR
+//#define ENABLE_LOWPWR
 				/*Compila el código habilitando la funcionalidad de Bajo Consumo. Comentar para deshabilitar */
 //#define ENABLE_PULSADOR
 				/*Compila el código habilitando la funcionalidad de accionar el pulsador para detener publicacion. Comentar para deshabilitar */
@@ -58,7 +58,7 @@
 #define NMAX_VUELTAS_OCIO  	3		//Nº maximo de vueltas al bucle de publicacion en estado ocioso para meterse al modo de bajo consumo
 
 #define NLECTURAS_MAGNETO  100 	//numero de muestras tomadas para leer valor medio del magnetometro
-#define TOL_MAGNETO  		10	//tolerancia de desviación estándar absoluta de medida del magnetómetro
+#define TOL_MAGNETO  		5	//tolerancia de desviación estándar absoluta de medida del magnetómetro
 
 #define SUPER_O    			167	   //para imprimir el caracter 'º', en ASCII
 

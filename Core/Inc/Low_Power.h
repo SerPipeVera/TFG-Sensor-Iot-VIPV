@@ -27,7 +27,7 @@
 
 /* Defines Privados ------------------------------------------------------------*/
 
-#define PERIODO_MIN_LPTIM1 		 1		//Periodo minimo de disparo del LPTIM1 para tomar muestras. Debe ser divisor de PERIODO_LECTURA_DATOS
+#define PERIODO_MIN_LPTIM1 	PERIODO_LECTURA_DATOS		//Periodo minimo de disparo del LPTIM1 para tomar muestras. Debe ser divisor de PERIODO_LECTURA_DATOS
 #define PERIODO_MIN_LPTIM2  	10		//Periodo minimo de disparo del LPTIM2 para publicar/recuperar conexion. Debe ser divisor de PERIODO_PUBLI y PERIODO_RECUPERA_DATOS
 
 #define FREC_LOWPOW    RCC_MSIRANGE_2  //frecuencia de trabajo en el modo de bajo consumo -> 400 kHz
@@ -221,21 +221,27 @@ void entraSleepMode(float Hora_Amanecer_Oficial)  {
 	printf("El dispositivo saldra del Modo Sleep dentro de %02d horas y %02d minutos... \n",
 			(int) truncf(tiempo_sleep/3600),(int) roundf(((tiempo_sleep/3600) - (truncf(tiempo_sleep/3600)) )*60));
 
-
+	HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
 	// Configurar el RTC para despertarse al cabo de tantos ticks de su reloj/16
 	uint32_t contador_tiempo =  TICKS_RTC_PER_SEC * tiempo_sleep;	//pasar de segundos a ticks
-	//activar la interrupcion para salir del modo de SHUTDOWN
-	HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, contador_tiempo, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
 
-	 HAL_GPIO_WritePin(ARD_A0_3_3CTRL_GPIO_Port, ARD_A0_3_3CTRL_Pin, GPIO_PIN_RESET);
-	  	  	  	  	  	  	  /*apagar alimentacion sensores a 3.3V del BMS */
+	 HAL_GPIO_WritePin(ARD_A0_3_3CTRL_GPIO_Port, ARD_A0_3_3CTRL_Pin, GPIO_PIN_RESET);	  	  	  	  	  	  /*apagar alimentacion sensores a 3.3V del BMS */
 	 HAL_GPIO_WritePin(GPIOC, ARD_A1_LEDWIFI_Pin | ARD_A2_LEDON_Pin, GPIO_PIN_RESET);	//LED de conexión Wi-Fi & ON
+
+	 //activar la interrupcion para salir del modo de SHUTDOWN
+	if ( HAL_OK != HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, contador_tiempo, RTC_WAKEUPCLOCK_RTCCLK_DIV16) ) //RTC_WAKEUPCLOCK_RTCCLK_DIV16 RTC_WAKEUPCLOCK_CK_SPRE_16BITS
+		{ Error_Handler(); }
+
 
 	 desinicializarPerifericos();
 
-	  HAL_PWREx_EnterSHUTDOWNMode();	//el modo mas potente de desactivacion, el sueño mas profundo
 
-	  HAL_NVIC_SystemReset();   /*Una vez el dispositivo despiesta de su letargo, se reinicia*/
+	  HAL_PWREx_EnterSHUTDOWNMode();	//el modo mas potente de desactivacion, el sueño mas profundo.
+	  /************************************************************************************************************
+	   * ***********************MODO DE SHUTDOWN ACTIVADO ********************************************************
+	   ***********************************************************************************************************/
+
+	  //Al despertar, llama al Callback del RTC para reiniciar de nuevo todo el programa y la placa
 }
 
 /*
@@ -258,10 +264,9 @@ void desinicializarPerifericos(void)  {
 	extern  UART_HandleTypeDef huart1;
 	extern  DMA_HandleTypeDef hdma_uart4_rx;
 
-	HAL_FLASHEx_EnableRunPowerDown();
 	desconectaConexionMQTT();
 	WIFI_Disconnect();
-	//WIFI_ResetModule();   //provoca errores
+	HAL_FLASHEx_EnableRunPowerDown();
 
 	  HAL_ADC_Stop_IT(&hadc1);
 	  HAL_ADC_Stop_DMA(&hadc1);
@@ -287,9 +292,19 @@ void desinicializarPerifericos(void)  {
 	  HAL_OPAMP_Stop(&hopamp2);
 	  HAL_OPAMP_DeInit(&hopamp2);
 
+	  HAL_NVIC_DisableIRQ(EXTI0_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI1_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI3_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+	  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+	  HAL_NVIC_DisableIRQ(I2C2_ER_IRQn);
+	  HAL_NVIC_DisableIRQ(I2C2_EV_IRQn);
+
 	  HAL_SPI_AbortCpltCallback(&hspi);
-	  HAL_SPI_Abort_IT(&hspi);
 	  HAL_SPI_Abort(&hspi);
+	  HAL_SPI_Abort_IT(&hspi);
 	  HAL_SPI_DMAStop(&hspi);
 	  HAL_SPI_DeInit(&hspi);
 
@@ -302,6 +317,13 @@ void desinicializarPerifericos(void)  {
 	  HAL_LPTIM_DeInit(&hlptim2);
 
 	  HAL_RNG_DeInit(&hrng);
+
+	  HAL_SuspendTick();
+
+	  HAL_RCCEx_DisableMSIPLLMode();
+	  HAL_RCCEx_DisablePLLSAI1();
+	  HAL_RCCEx_DisablePLLSAI2();
+	  __HAL_RCC_PWR_CLK_DISABLE();
 
 	  HAL_GPIO_WritePin(GPIOE, RED_LED_Pin|ISM43362_RST_Pin, GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOC, ARD_A2_LEDON_Pin|ARD_A1_LEDWIFI_Pin|LED3_WIFI__LED4_BLE_Pin, GPIO_PIN_RESET);
@@ -330,15 +352,6 @@ void desinicializarPerifericos(void)  {
 	  HAL_GPIO_DeInit(GPIOD, PMOD_UART2_CTS_Pin|PMOD_UART2_RTS_Pin|PMOD_UART2_TX_Pin|PMOD_UART2_RX_Pin);
 	  HAL_GPIO_DeInit(GPIOB, ARD_D15_Pin|ARD_D14_Pin);
 	  HAL_GPIO_DeInit(ISM43362_DRDY_EXTI1_GPIO_Port, ISM43362_DRDY_EXTI1_Pin);
-
-	  HAL_SuspendTick();
-
-	  HAL_RCCEx_DisableLSCO();
-	  HAL_RCCEx_DisableMSIPLLMode();
-	  HAL_RCCEx_DisablePLLSAI1();
-	  HAL_RCCEx_DisablePLLSAI2();
-	  HAL_RCC_DeInit();
-	  __HAL_RCC_PWR_CLK_DISABLE();
 
 }
 
@@ -391,6 +404,11 @@ void entrar_LowPowerMode(void)  {
 	/*Ahora si, se entra en el modo de bajo consumo */
 
 	HAL_PWREx_EnableLowPowerRunMode();
+	  /************************************************************************************************************
+	   * ***********************MODO DE BAJO CONSUMO ACTIVADO *****************************************************
+	   ***********************************************************************************************************/
+	 HAL_NVIC_SystemReset();   ///Una vez el dispositivo despiesta de su letargo, se reinicia
+
 
 }
 
@@ -406,6 +424,9 @@ void salir_LowPowerMode(void) {
 	if( HAL_PWREx_DisableLowPowerRunMode() != HAL_OK )  {	//comprobación visual
 		Error_Handler();
 		}
+	  /************************************************************************************************************
+	   * ***********************MODO DE BAJO CONSUMO DESACTIVADO **************************************************
+	   ***********************************************************************************************************/
 
 	SystemClock_Config();	//reinicializar el reloj habitual
 	HAL_ResumeTick();
@@ -416,6 +437,18 @@ void salir_LowPowerMode(void) {
 	printf("\tSaliendo del modo de Bajo Consumo... \n");
 }
 
+/*
+  * @brief Callback de la interrupción de WakeUp del RTC para resetar el programa vencido un tiempo del RTC
+  * @param RTC_HandleTypeDef *hrtc_0 instancia del RTC
+  * @retval void
+  */
+
+void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef *hrtc_0) {
+
+	if (hrtc_0 == &hrtc ) {
+	  //HAL_NVIC_SystemReset();   ///Una vez el dispositivo despiesta de su letargo, se reinicia
+	}
+}
 
 #endif /* APPLICATION_USER_LOW_POWER_H_ */
 

@@ -48,6 +48,8 @@ extern "C" {
 #define CANAL1_THINSPEAK_WR_APIKEY "channels/1035442/publish/8NDUTS0CEEN302UK"
 #define CANAL2_THINSPEAK_WR_APIKEY "channels/1080517/publish/62D7OVDI6RMUXRRA"
 
+#define NMAX_INTENTOS_CONEX 	15 		//Nº máximo de intentos de conexión inicial a la red
+
 #include "stm32l475e_iot01.h"
 #include "stm32l4xx_hal_iwdg.h"
 #include "version.h"
