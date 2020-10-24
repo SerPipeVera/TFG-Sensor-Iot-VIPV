@@ -33,9 +33,11 @@
 #define MAG_HIOFFSET_Y 			 233	// Comprobar paper de STM: "Getting started with MotionFX sensor fusion library in X-CUBE-MEMS1expansion"
 #define MAG_HIOFFSET_Z			 91		//https://www.st.com/resource/en/user_manual/dm00394369-getting-started-with-motionfx-sensor-fusion-library-in-xcubemems1-expansion-for-stm32cube-stmicroelectronics.pdf
 
-#define ALGORITHM_FREQ  10.0f /* Frecuencia de ejecucción del algoritomo*/
+#define ALGORITHM_FREQ  50.0f /* Frecuencia de ejecucción del algoritomo, necesita ser modificada desde el MX TIM6*/
+
 #define ALGO_PERIOD  ((int)(1000.0f / ALGORITHM_FREQ)) /* Algorithm period [ms] */
 #define MOTION_FX_ENGINE_DELTATIME  ((float)(1.0f / ALGORITHM_FREQ)) //periodo de computacion de f. Kalman en [s]
+
 #define FREC_CALIB_MAGNETO  40  //Frecuencia de acualizacion del codigo de calibracion del magentometro
 
 #define ATIME_REF   (0.9f)	//Entre 0 y 1 para ponderar magnetometro
@@ -241,9 +243,9 @@ char MotionFX_SaveMagCalInNVM(unsigned short int dataSize, unsigned int *data);
 //	  float headingErr_9X;                        /* 9 axes heading error in deg */
 //	} MFX_output_t;
 
-	*roll = pdata_out->rotation_9X[1];
-	*pitch= pdata_out->rotation_9X[2];
-	*yaw =  pdata_out->rotation_9X[0];
+	*roll = (-1.0f) * pdata_out->rotation_9X[1];  //Cambio sistema referencia del vehiculo, de ENU  a NWU
+	*pitch= (-1.0f) *pdata_out->rotation_9X[2];
+	*yaw =  ((-1.0f) *pdata_out->rotation_9X[0] )+360.0f ;
 
 }
 
@@ -401,6 +403,10 @@ static void Magneto_Sensor_Handler(int16_t *pMagnetoXYZ)
 		  MagOffset.y = (int32_t) roundf(ans_float);
 		  ans_float = (float)(mag_data_out.hi_bias[2] * FROM_UT50_TO_MGAUSS );
 		  MagOffset.z = (int32_t) roundf(ans_float);
+
+		  printf("\n Los nuevos valores de calibracion del Magnetometro en Hard Iron son: \n"
+				  "MagOffset.x = %d \nMagOffset.y = %d \nMagOffset.z = %d \n\n",
+				  (int)MagOffset.x, (int)MagOffset.y ,(int)MagOffset.z );
 
 		  /* Disable magnetometer calibration */
 		  MotionFX_MagCal_init(ALGO_PERIOD, 0); //STOP magneto calibration

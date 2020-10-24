@@ -29,7 +29,6 @@
 
 #define PERIODO_MIN_LPTIM1 		 1		//Periodo minimo de disparo del LPTIM1 para tomar muestras. Debe ser divisor de PERIODO_LECTURA_DATOS
 #define PERIODO_MIN_LPTIM2  	10		//Periodo minimo de disparo del LPTIM2 para publicar/recuperar conexion. Debe ser divisor de PERIODO_PUBLI y PERIODO_RECUPERA_DATOS
-#define PERIODO_MIN_TIM_MEMS  	0.1f		//Periodo minimo de disparo del TIM6 para alzar la bandera de lectura del MEMS
 
 #define FREC_LOWPOW    RCC_MSIRANGE_2  //frecuencia de trabajo en el modo de bajo consumo -> 400 kHz
 

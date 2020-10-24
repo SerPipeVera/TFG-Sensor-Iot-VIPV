@@ -31,6 +31,8 @@ bool modo_BajoConsumo = false, ocioso = true;
 #endif
 static uint16_t contador_lectura = 0, contador_MEMS = 0;
 
+static megaDato vectorLecturaDato[N_ELEMENTOS] = { {0.0f} };	//inicializacion a 0 de todo el vector
+
 static bool flag_lectura_datos=false, flag_publi_datos = false, flag_recupera_datos = false;
 static bool flag_lecturaMEMS = false;
 
@@ -81,22 +83,11 @@ void aplicacion_ClienteMQTT_XCLD_IoT(void)
 
       if (conex_correcta)  {
 
-    	  if ( HAL_LPTIM_TimeOut_Start_IT(&hlptim1, PERIODO_LPTIM, TIMEOUT_LPTIM1) != HAL_OK)	//Puesta a punto de temporizadores
-    	  	  { Error_Handler(); }
-    	  if ( HAL_LPTIM_TimeOut_Start_IT(&hlptim2, PERIODO_LPTIM, TIMEOUT_LPTIM2) != HAL_OK)
-    	      { Error_Handler(); }
-    	  if ( HAL_TIM_Base_Start_IT(&htim6) != HAL_OK )
-    	  	  { Error_Handler(); }
+    	 switch_Temporizadores(ENCENDER_TIMERS);
 
+         bucle_Principal();  /*-------------------------BUCLE INTERNO DE ENVÍO DE DATOS----------------------------*/
 
-         bucle_Lectura_Publicacion();  /*-------------------------BUCLE INTERNO DE ENVÍO DE DATOS----------------------------*/
-
-
-		  if ( HAL_LPTIM_TimeOut_Stop_IT(&hlptim1) != HAL_OK  ||  HAL_LPTIM_TimeOut_Stop_IT(&hlptim2) != HAL_OK)
-		  	  { Error_Handler(); }
-		  if (HAL_TIM_Base_Stop_IT(&htim6) != HAL_OK)
-			  { Error_Handler(); }
-
+         switch_Temporizadores(APAGAR_TIMERS);
 
       }
       else   {
@@ -135,9 +126,8 @@ void aplicacion_ClienteMQTT_XCLD_IoT(void)
  * @param   void: no recibe parametros
  * @retval  no devuelve parametros.
  */
-void bucle_Lectura_Publicacion(void)  {
+void bucle_Principal(void)  {
 
- static megaDato vectorLecturaDato[N_ELEMENTOS] = { {0.0f} };	//inicializacion a 0 de todo el vector
 
 #ifdef ENABLE_LOWPWR
   uint32_t n_ocio = 0;
@@ -164,7 +154,66 @@ void bucle_Lectura_Publicacion(void)  {
     /*******************************   HILO DE EJECUCCIÓN DE LECTURA DE DATOS **********************************************/
     /***********************************************************************************************************************/
     if ( flag_lectura_datos )  {	  /* Lee los datos de todos los sensores */
-    	/*No necesita de salir del modo de bajo consumo, es apto para esta funcion*/
+
+    	hilo1_Lectura();
+
+    }
+
+
+
+    /*********************************************************************************************************************************/
+    /***********************   HILO DE EJECUCCIÓN DE PUBLICACION DE DATOS EN THINGSPEAK **********************************************/
+    /*********************************************************************************************************************************/
+    if ( flag_publi_datos && (contador_lectura>0) && (g_publishData == true) )	/*Publica los datos de la media*/
+    {
+    	hilo2_Publicacion();
+    }
+
+
+
+    /*********************************************************************************************************************************/
+    /********************   HILO DE EJECUCCIÓN DE RECUPERACIÓN DE DATOS EN LA FIFO DE MEMORIA SRAM ***********************************/
+    /*********************************************************************************************************************************/
+    if ( flag_recupera_datos && estaFIFOvacia(&miFIFO)  && (g_publishData == true) )
+    {
+    	hilo3_Reconexion();
+	}
+
+
+
+    /*********************************************************************************************************************************/
+    /********************   HILO DE COMPUTACIÓN ALGORITMO FUSIÓN MEMS Y FILTRO KALMAN ************************************************/
+    /*********************************************************************************************************************************/
+     if( flag_lecturaMEMS  )
+    {
+    	hilo4_MEMS();
+    }
+
+#ifdef ENABLE_LOWPWR
+     if (ocioso)  {	//en caso de que no haya entrado a ninguno de los 3 hilos, suma 1 a la variable n_ocio
+
+    	 if(n_ocio >= NMAX_VUELTAS_OCIO &&  (!modo_BajoConsumo) ) {
+
+    		modo_BajoConsumo = true;
+    		entrar_LowPowerMode(); //modo de bajo consumo, despertado por los otros hilos de trabajo
+
+    	}else { n_ocio++ ;}
+
+    }else {
+    		n_ocio = 0;  modo_BajoConsumo = false;  //lo resetea
+    		}
+#endif
+
+  } while ( g_continueRunning );
+
+
+} //fin de la funcion bucle lectura envio datos
+
+
+
+void hilo1_Lectura(void)
+{
+
 #ifdef ENABLE_LOWPWR
 	if(modo_BajoConsumo) {  salir_LowPowerMode();  } //saliendo del modo de bajo consumo
 #endif
@@ -178,27 +227,11 @@ void bucle_Lectura_Publicacion(void)  {
 		if(contador_lectura >= (N_ELEMENTOS-1)){
 		   contador_lectura = (N_ELEMENTOS-1);	//va desde 0 a N-1
 		}
-    }
+}
 
-    if( flag_lecturaMEMS ) {
+void hilo2_Publicacion(void)
+{
 
-    	float roll = 0.0f, pitch = 0.0f, yaw = 0.0f;
-
-		 MX_MEMS_Process(&roll, &pitch, &yaw);
-		 flag_lecturaMEMS = false;
-		 alebeo_sum += (roll<0.0f)? (1-.0f*roll) :  (roll);
-		 cabeceo_sum += (pitch<0.0f)? (1-.0f*pitch) :(pitch);
-		 guino_sum +=  (yaw<0.0f) ? (1-.0f*yaw) :  (yaw);
-		 contador_MEMS ++;
-
-    }
-
-
-    /*********************************************************************************************************************************/
-    /***********************   HILO DE EJECUCCIÓN DE PUBLICACION DE DATOS EN THINGSPEAK **********************************************/
-    /*********************************************************************************************************************************/
-    if ( flag_publi_datos && (contador_lectura>0) && (g_publishData == true) )	/*Publica los datos de la media*/
-    {
 #ifdef ENABLE_LOWPWR
 	if(modo_BajoConsumo) { salir_LowPowerMode();  } //saliendo del modo de bajo consumo
 #endif
@@ -242,15 +275,12 @@ void bucle_Lectura_Publicacion(void)  {
 			 printf("El numero de nodos en la FIFO es: %d \n", estaFIFOvacia(&miFIFO) );
 		  }
       }
-    }
+}
 
 
+void hilo3_Reconexion(void)
+{
 
-    /*********************************************************************************************************************************/
-    /********************   HILO DE EJECUCCIÓN DE RECUPERACIÓN DE DATOS EN LA FIFO DE MEMORIA SRAM ***********************************/
-    /*********************************************************************************************************************************/
-    if ( flag_recupera_datos && estaFIFOvacia(&miFIFO)  && (g_publishData == true) )
-    {
 #ifdef ENABLE_LOWPWR
 	if(modo_BajoConsumo) {  salir_LowPowerMode();  }  //saliendo del modo de bajo consumo
 #endif
@@ -284,28 +314,26 @@ void bucle_Lectura_Publicacion(void)  {
 
 		}
 		printf("El numero de nodos en la FIFO es: %d \n", estaFIFOvacia(&miFIFO) );
-	}
+
+}
+
+void hilo4_MEMS(void)
+{
+
+	float roll = 0.0f, pitch = 0.0f, yaw = 0.0f;
 
 #ifdef ENABLE_LOWPWR
-     if (ocioso)  {	//en caso de que no haya entrado a ninguno de los 3 hilos, suma 1 a la variable n_ocio
-
-    	 if(n_ocio >= NMAX_VUELTAS_OCIO &&  (!modo_BajoConsumo) ) {
-
-    		modo_BajoConsumo = true;
-    		entrar_LowPowerMode(); //modo de bajo consumo, despertado por los otros hilos de trabajo
-
-    	}else { n_ocio++ ;}
-
-    }else {
-    		n_ocio = 0;  modo_BajoConsumo = false;  //lo resetea
-    		}
+	if(modo_BajoConsumo) {  salir_LowPowerMode();  }  //saliendo del modo de bajo consumo
 #endif
 
-  } while ( g_continueRunning );
+	 MX_MEMS_Process(&roll, &pitch, &yaw);	//función de computo
+	 flag_lecturaMEMS = false;
+	 alebeo_sum += roll;
+	 cabeceo_sum += pitch;
+	 guino_sum +=  yaw;
+	 contador_MEMS ++;
 
-
-} //fin de la funcion bucle lectura envio datos
-
+}
 
 
 /**
@@ -559,9 +587,9 @@ void recabar_Datos(megaDato* miLectura){
 	}
 
 
-	miLectura->alebeo = alebeo_sum / contador_MEMS;
-	miLectura->cabeceo = cabeceo_sum / contador_MEMS;
-	miLectura->guino_brujula = guino_sum / contador_MEMS;
+	miLectura->alebeo = alebeo_sum / (float)contador_MEMS;
+	miLectura->cabeceo = cabeceo_sum / (float)contador_MEMS;
+	miLectura->guino_brujula = guino_sum / (float)contador_MEMS;
 
 	alebeo_sum = 0.0f;  cabeceo_sum = 0.0f;   guino_sum = 0.0f; //Reseteo de acumuladores de medias parciales
 
@@ -580,6 +608,9 @@ void recabar_Datos(megaDato* miLectura){
 
 
 #ifdef ENABLE_IMPRIMIR_MUESTRAS	//imprime cada muestra si el usuario compilador lo desea
+
+		printf("\x1b[2J" "\x1b[f"); //limpiar buffer y ventana de TeraTerm
+
 	    printf("\n\t-------------- Datos Leidos por el uC STM32-L475-VGT6 ----------------\n"
 	    		"Irradiancia modulo FV 1:   %f\n"
 	    		"Irradiancia modulo FV 2:   %f\n"
@@ -593,9 +624,9 @@ void recabar_Datos(megaDato* miLectura){
 	    		"Longitud geografica        :      %f\n"
 	    		"Altitud geografica         :      %f\n"
 	    		"Velocidad desplazamiento   :      %f\n"
-	    		"Alebeo 	X :                    %f\n"
-	    		"Cabeceo 	Y :                    %f\n"
-	    		"Gui%cada   Z :                    %f\n"
+	    		"Alabeo    X :                     %f\n"
+	    		"Cabeceo   Y :                     %f\n"
+	    		"Gui%cada   Z :                     %f\n"
 	    		"Fecha y hora de la medicion:      %02d-%02d-%04d  %02d:%02d:%02d \n",
 				miLectura->irradiancia[0], miLectura->irradiancia[1], miLectura->irradiancia[2], miLectura->irradiancia[3], miLectura->irradiancia[4],
 				miLectura->temperatura, miLectura->presion,miLectura->humedad,
@@ -620,7 +651,7 @@ void recabar_Datos(megaDato* miLectura){
  */
 void mideRadiacion(float vectIrradiancia[])
 {
-	float nivelmedioADC = 0,  offset_ADC = 0; //nivel de Offset medido en el ADC
+	float nivelmedioADC = 0.0f,  offset_ADC = 0.0f; //nivel de Offset medido en el ADC
 
 	/*Estado de partida*/
 	  HAL_GPIO_WritePin(ARD_D10_MFT_GPIO_Port, ARD_D10_MFT_Pin, GPIO_PIN_SET);
@@ -631,6 +662,8 @@ void mideRadiacion(float vectIrradiancia[])
 	for(uint8_t npv = 0 ; npv<= NMAX_MODULOS; npv++)
 	{
 		float tensionADC = 0.0f, corrienteFV = 0.0f, irradianciaFV = 0.0f;
+		float suma_media = 0.0f;
+		uint64_t contador = 0,  mseg ;
 
 		switch (npv)		//activa y desactiva los GPIO de los interruptores oportunos
 		{
@@ -692,7 +725,15 @@ void mideRadiacion(float vectIrradiancia[])
 
 		HAL_Delay(T_ESPERA);	//1 milisegundo de Delay entre medidas, para conmutar los interruptores y estabilizar medidas del ADC.
 
-		nivelmedioADC = toma_datoADC(T_MEDICION);
+
+		mseg = HAL_GetTick();
+
+		do{	// medidas medias redundantes del ADC además del oversampling.
+			suma_media += ADC1_buffer;
+			contador++;
+		}while (HAL_GetTick() - mseg < T_MEDICION);
+
+		nivelmedioADC =  (float) suma_media / contador;
 
 		if( npv == 0 ) {
 			offset_ADC =  nivelmedioADC;
@@ -717,36 +758,7 @@ void mideRadiacion(float vectIrradiancia[])
 
 	 HAL_GPIO_WritePin(ARD_D10_MFT_GPIO_Port, ARD_D10_MFT_Pin, GPIO_PIN_RESET);
 
-#ifdef 	 ENABLE_IMPRIMIR_MUESTRAS
-	 HAL_Delay(T_ESPERA*2);	//Para medir corriente al BMS
-
-	 printf("La corriente total que va ahora al BMS es: %f mA\n ",
-	 		(( (toma_datoADC(T_MEDICION)) - offset_ADC)/NIVELES_ADC ) * VREF_ADC /  (SENS_HALL * FACTOR_OPAMP) );
-#endif
-
 }
-
-/*
-  * @brief Función de recogida del valor del la variable del ADC mediante un muestreo contínuo durante un tiempo
-  * determinado. Evita que se realicen mediciones espúreas en el ADC.
-  * @param t_espera de medidas contínuas del ADC
-  * @retval nivel medio del ADC en ese periodo
-  */
-float toma_datoADC(uint16_t t_espera) {
-
-	float suma_media = 0.0f;
-	uint64_t contador = 0;
-	uint64_t mseg = HAL_GetTick();
-
-	do{	//el periodo de medición del ADC1 es 23.125 us, se median las medidas en 2ms.
-		suma_media += ADC1_buffer;
-		contador++;
-	}while (HAL_GetTick() - mseg < t_espera);
-
-	return ((float) suma_media / contador);
-
-}
-
 
 
 
@@ -784,6 +796,8 @@ bool reconecta_WiFi(void)  {
   * @retval None
   */
 void imprimir_Dato(megaDato Dato)  {
+
+	printf("\x1b[2J" "\x1b[f"); //limpiar buffer y ventana de TeraTerm
 
     printf("\n************************ DATOS PUBLICADOS EN LA NUBE DE THINGSPEAK ************************\n"
     		"-------------------------------- CANAL 1 ---------------------------------\n"
@@ -1018,6 +1032,28 @@ bool inicializa_ConexionIoT(void)   {
 	  return (ret == 0);
 }
 
+void switch_Temporizadores(bool estado)
+{
+	if(estado == ENCENDER_TIMERS) {
+
+  	  if ( HAL_LPTIM_TimeOut_Start_IT(&hlptim1, PERIODO_LPTIM, TIMEOUT_LPTIM1) != HAL_OK)	//Puesta a punto de temporizadores
+  	  	  { Error_Handler(); }
+  	  if ( HAL_LPTIM_TimeOut_Start_IT(&hlptim2, PERIODO_LPTIM, TIMEOUT_LPTIM2) != HAL_OK)
+  	      { Error_Handler(); }
+  	  if ( HAL_TIM_Base_Start_IT(&htim6) != HAL_OK )
+  	  	  { Error_Handler(); }
+	}
+	if(estado == APAGAR_TIMERS) {
+
+		  if ( HAL_LPTIM_TimeOut_Stop_IT(&hlptim1) != HAL_OK  )
+		  	  { Error_Handler(); }
+		  if (  HAL_LPTIM_TimeOut_Stop_IT(&hlptim2) != HAL_OK )
+		  	  { Error_Handler(); }
+		  if (HAL_TIM_Base_Stop_IT(&htim6) != HAL_OK)
+			  { Error_Handler(); }
+	}
+}
+
 /**
  * @brief   Funcion de callback de las interrupciones de los TIMERS de bajo consumo. Implementa una lógica
  * de temporización de los 3 principales hilos de ejecucción mediante el uso de banderas y contadores de
@@ -1060,17 +1096,11 @@ void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
-	static uint16_t contador_TimerMEMS = 0;
 
 	if(htim == &htim6) {
 
-		contador_TimerMEMS++;
+		flag_lecturaMEMS = true;
 
-				if(contador_TimerMEMS >= (PERIODO_LECTURA_MEMS/PERIODO_MIN_TIM_MEMS)) {	//si supera los 60/10 = 6 vueltas
-
-					flag_lecturaMEMS = true;
-					contador_TimerMEMS = 0;
-				}
 	}
 }
 

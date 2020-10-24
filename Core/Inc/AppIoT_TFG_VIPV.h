@@ -42,7 +42,6 @@
 #define PERIODO_LECTURA_DATOS     1		//Periodo de lectura de los datos
 #define PERIODO_RECUPERA_DATOS   20 	/*periodo minimo de ThingSpeak para recuperar los datos es de 15 seg
 										 https://thingspeak.com/pages/license_faq   */
-#define PERIODO_LECTURA_MEMS    0.1f	//Cada 100ms se lee dato del MEMS, a una frecuencia de 10Hz
 
 #define T_MEDICION		  3     //Tiempo en ms durante el cual permanece midiendo un módulo FV
 #define T_ESPERA		  5	   //Tiempo que espera entre permutaciones de los BJT para tomar las medidas, por si acaso, grande, no hay prisa
@@ -88,6 +87,7 @@ const float CTE_CALIBR_FV[NMAX_MODULOS] = { 3.814272392f, 3.804324917f, 3.702794
 
 
 enum {DESCONECTADO=0, CONECTADO};	//Enumeracion simple para ver estado conexión wifi
+enum {APAGAR_TIMERS=0, ENCENDER_TIMERS};	//Enumeracion simple para habilitar/deshabilitar interrupc temporizadores
 
 extern bool iniciado_Programa;		//Variable para comrpobar el punto del programa en el que el haya
 
@@ -101,21 +101,26 @@ extern TIM_HandleTypeDef htim6;
 
 void aplicacion_ClienteMQTT_XCLD_IoT(void);
 
+
+
 void mideRadiacion(float vectIrradiancia[]);
-float toma_datoADC(uint16_t t_espera);
-float orienta_Magneto(void) ;
 void recabar_Datos(megaDato* miLectura); //función de recogida de datos
 bool publica_DatosThingSpeak(megaDato* miDato);
 void calcula_mediaVector(megaDato* mediaDatos, megaDato* p_ectorLecturas, uint8_t n_elem );
 void imprimir_Dato(megaDato Dato);
 
-void bucle_Lectura_Publicacion(void);
+void bucle_Principal(void);
+void hilo1_Lectura(void);	//Rutinas de hilos de ejecucción
+void hilo2_Publicacion(void);
+void hilo3_Reconexion(void);
+void hilo4_MEMS(void);
 bool reconecta_WiFi(void);
 
-int check_protocoloConexion(void);
+int  check_protocoloConexion(void);
 bool inicia_ClienteMQTT(int ret);
 bool desconectaConexionMQTT(void);
 bool inicializa_ConexionIoT(void);
+void switch_Temporizadores(bool estado);
 
 /* Funcíón externa de la biblioteca NMEA --------------------------------------------------------*/
 
