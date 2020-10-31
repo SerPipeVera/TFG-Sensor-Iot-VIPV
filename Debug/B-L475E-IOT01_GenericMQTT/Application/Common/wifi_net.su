@@ -1,3 +1,0 @@
-wifi_net.c:67:5:net_if_init	104	static
-wifi_net.c:147:5:net_if_deinit	16	static
-wifi_net.c:153:5:net_if_reinit	40	static
