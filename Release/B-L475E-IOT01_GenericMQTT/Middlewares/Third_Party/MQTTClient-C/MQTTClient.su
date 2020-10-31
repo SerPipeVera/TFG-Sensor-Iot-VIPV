@@ -1,0 +1,16 @@
+MQTTClient.c:264:6:MQTTCloseSession	0	static
+MQTTClient.c:43:12:sendPacket	40	static
+MQTTClient.c:273:5:cycle	104	static
+MQTTClient.c:406:5:waitfor	24	static
+MQTTClient.c:66:6:MQTTClientInit	8	static
+MQTTClient.c:356:5:MQTTYield	24	static
+MQTTClient.c:377:6:MQTTRun	16	static
+MQTTClient.c:424:5:MQTTConnectWithResults	120	static
+MQTTClient.c:479:5:MQTTConnect	16	static
+MQTTClient.c:486:5:MQTTSetMessageHandler	24	static
+MQTTClient.c:528:5:MQTTSubscribeWithResults	88	static
+MQTTClient.c:576:5:MQTTSubscribe	24	static
+MQTTClient.c:584:5:MQTTUnsubscribe	48	static
+MQTTClient.c:628:5:MQTTPublish	72	static
+MQTTClient.c:690:5:MQTTDisconnect	16	static
+MQTTClient.c:713:5:MQTTIsConnected	0	static
