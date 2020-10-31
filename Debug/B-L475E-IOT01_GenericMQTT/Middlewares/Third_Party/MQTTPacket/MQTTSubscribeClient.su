@@ -1,3 +1,0 @@
-MQTTSubscribeClient.c:29:5:MQTTSerialize_subscribeLength	24	static
-MQTTSubscribeClient.c:51:5:MQTTSerialize_subscribe	48	static
-MQTTSubscribeClient.c:101:5:MQTTDeserialize_suback	48	static
