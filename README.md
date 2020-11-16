@@ -7,6 +7,14 @@ Los resultados de los ensayos realizados se encuentran publicados en el servidor
 https://thingspeak.com/channels/1035442
 https://thingspeak.com/channels/1080517
 
+Video demostrativo del ensayayo en circulacion ->
+https://youtu.be/OVeeHsWhGUc
+
+
+Cualquier clase de feedback es bienvenido. Si tienes alguna duda o comentario respecto al proyecto, no dudes en ponerte en contacto conmigo:
+Email:  serveramz@hotmail.com
+LinkedIn: https://www.linkedin.com/in/sergioveramunoz/
+
 
 	Proyecto desarrollado por Sergio Vera Muñoz - UPM - IES
-	https://www.linkedin.com/in/sergioveramunoz/
+	
