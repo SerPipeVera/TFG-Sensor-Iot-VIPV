@@ -7,7 +7,7 @@ Los resultados de los ensayos realizados se encuentran publicados en el servidor
 https://thingspeak.com/channels/1035442
 https://thingspeak.com/channels/1080517
 
-Video demostrativo del ensayayo en circulacion ->
+Video demostrativo del ensayo en circulacion ->
 https://youtu.be/OVeeHsWhGUc
 
 
